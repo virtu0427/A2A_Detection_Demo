@@ -1,28 +1,17 @@
-<svg width="180" height="140" viewBox="0 0 180 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="spine" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#5ac8fa" />
-      <stop offset="100%" stop-color="#2563eb" />
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="180" height="140" rx="24" fill="#0b1729" />
-  <path
-    d="M34 96C20 76 24 48 52 38L72 32L78 44L94 36L100 48L116 42L124 52L140 54C146 62 148 70 148 82C148 104 126 118 96 118H64C50 118 40 110 34 96Z"
-    fill="#16253d"
-    stroke="url(#spine)"
-    stroke-width="4"
-    stroke-linejoin="round"
-  />
-  <path
-    d="M54 30L60 16M70 28L74 10M86 30L92 14M104 36L110 20M120 46L128 30"
-    stroke="url(#spine)"
-    stroke-width="4"
-    stroke-linecap="round"
-  />
-  <circle cx="92" cy="74" r="6" fill="#5ac8fa" />
-  <path d="M76 84C84 88 94 90 108 84" stroke="#5ac8fa" stroke-width="4" stroke-linecap="round" />
-  <path d="M58 92C60 98 66 106 78 110" stroke="#5ac8fa" stroke-width="4" stroke-linecap="round" />
-  <text x="156" y="52" text-anchor="middle" font-family="'Noto Sans KR', 'Segoe UI', sans-serif" font-weight="700" font-size="28" fill="#5ac8fa">A</text>
-  <text x="156" y="84" text-anchor="middle" font-family="'Noto Sans KR', 'Segoe UI', sans-serif" font-weight="700" font-size="28" fill="#5ac8fa">T</text>
-  <text x="156" y="116" text-anchor="middle" font-family="'Noto Sans KR', 'Segoe UI', sans-serif" font-weight="700" font-size="28" fill="#5ac8fa">G</text>
+<svg width="148" height="148" viewBox="0 0 148 148" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#3f4c5a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M26 96c-8-16-4-40 22-50l18-6 6 12 16-8 6 12 16-6 8 10 16 2c6 8 8 16 8 28 0 22-20 36-50 36H60c-14 0-24-8-30-20Z" />
+    <path d="M52 34 60 18" />
+    <path d="M70 30 76 14" />
+    <path d="M90 32 96 16" />
+    <path d="M110 40 118 24" />
+    <path d="M52 94c4 8 10 14 20 18" />
+    <path d="M78 86c8 4 18 4 30-2" />
+  </g>
+  <circle cx="88" cy="74" r="5" fill="#3f4c5a" />
+  <g fill="#3f4c5a" font-family="'Noto Sans KR', 'Segoe UI', sans-serif" font-weight="700" font-size="28">
+    <text x="134" y="52" text-anchor="middle">A</text>
+    <text x="134" y="84" text-anchor="middle">T</text>
+    <text x="134" y="116" text-anchor="middle">G</text>
+  </g>
 </svg>
