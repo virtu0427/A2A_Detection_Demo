@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}패킷 분석 · A2A 보안 센터{% endblock %}
+{% block page_id %}packets{% endblock %}
+{% block content %}
+  <section class="hero compact">
+    <div>
+      <h1>패킷 탐지 로그 검색</h1>
+      <p>
+        저장된 분석 결과를 위협 유형, 레이어, 에이전트 단위로 탐색하고 세부 대응 이력을 확인합니다.
+      </p>
+    </div>
+    <div class="hero-highlight small">
+      <h2>패킷 통계</h2>
+      <ul>
+        <li><span id="metric-total-packets">-</span><small>총 분석 로그</small></li>
+        <li><span id="metric-severity-high">-</span><small>고위험</small></li>
+        <li><span id="metric-severity-medium">-</span><small>중간</small></li>
+        <li><span id="metric-severity-low">-</span><small>낮음</small></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel stack">
+    <header class="panel-header">
+      <div>
+        <h2>필터링 옵션</h2>
+        <p>위협 유형 키워드나 에이전트 이름으로 결과를 세분화할 수 있습니다.</p>
+      </div>
+      <div class="quick-filters">
+        <button type="button" data-severity="높음" class="chip">고위험</button>
+        <button type="button" data-severity="중간" class="chip">중간</button>
+        <button type="button" data-severity="낮음" class="chip">낮음</button>
+        <button type="button" data-reset class="chip muted">초기화</button>
+      </div>
+    </header>
+
+    <form id="packet-filter" class="filter-form">
+      <label>
+        위협 유형
+        <input name="threat" placeholder="예: Task Replay" />
+      </label>
+      <label>
+        심각도
+        <select name="severity">
+          <option value="">전체</option>
+          <option value="높음">높음</option>
+          <option value="중간">중간</option>
+          <option value="낮음">낮음</option>
+        </select>
+      </label>
+      <label>
+        출발 에이전트
+        <input name="source" placeholder="예: Atlas" />
+      </label>
+      <label>
+        도착 에이전트
+        <input name="target" placeholder="예: Hermes" />
+      </label>
+      <label>
+        네트워크 레이어
+        <select name="layer">
+          <option value="">전체</option>
+          <option value="Layer 1">Layer 1</option>
+          <option value="Layer 2">Layer 2</option>
+          <option value="Layer 3">Layer 3</option>
+          <option value="Layer 4">Layer 4</option>
+          <option value="Layer 6">Layer 6</option>
+          <option value="Layer 7">Layer 7</option>
+        </select>
+      </label>
+      <button type="submit">검색 실행</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>분석 로그 테이블</h2>
+    <div class="table-wrapper">
+      <table id="packet-table">
+        <thead>
+          <tr>
+            <th>시간</th>
+            <th>출발</th>
+            <th>도착</th>
+            <th>레이어</th>
+            <th>위협</th>
+            <th>심각도</th>
+            <th>요약</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="7" class="empty">조건을 선택하거나 검색을 실행해 주세요.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

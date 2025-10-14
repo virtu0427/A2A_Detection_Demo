@@ -7,7 +7,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
 
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "a2a_demo.db")
 
@@ -235,11 +235,13 @@ def generate_event():
         "Emergent Vulnerability",
     ]
     severities = ["낮음", "중간", "높음"]
+    layers = ["Layer 2", "Layer 3", "Layer 4", "Layer 6", "Layer 7"]
 
     while True:
         source, target = random.sample(agents, 2)
         threat_type = random.choice(threat_types)
         severity = random.choices(severities, weights=[0.3, 0.4, 0.3])[0]
+        protocol_layer = random.choice(layers)
         timestamp = datetime.utcnow().isoformat()
         description = f"{source['name']} → {target['name']} 통신 중 '{threat_type}' 시그니처 감지"
 
@@ -249,6 +251,7 @@ def generate_event():
             "target_agent": target["name"],
             "threat_type": threat_type,
             "severity": severity,
+            "protocol_layer": protocol_layer,
             "description": description,
         }
 
@@ -278,7 +281,22 @@ def background_event_thread():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html", active_page="dashboard")
+
+
+@app.route("/graph")
+def graph():
+    return render_template("graph.html", active_page="graph")
+
+
+@app.route("/packets")
+def packets():
+    return render_template("packets.html", active_page="packets")
 
 
 @app.route("/api/agents")
@@ -297,7 +315,15 @@ def api_agents():
     ]
 
     conn.row_factory = sqlite3.Row
-    communications = conn.execute("SELECT * FROM communications").fetchall()
+    communications = conn.execute(
+        """
+        SELECT communications.*, s.name AS source_name, t.name AS target_name
+        FROM communications
+        JOIN agents AS s ON communications.source_agent_id = s.id
+        JOIN agents AS t ON communications.target_agent_id = t.id
+        ORDER BY datetime(communications.last_activity) DESC
+        """
+    ).fetchall()
     graph_edges = []
     for row in communications:
         graph_edges.append(
@@ -309,7 +335,25 @@ def api_agents():
             }
         )
 
-    return jsonify({"agents": agents, "nodes": graph_nodes, "edges": graph_edges})
+    comm_details = [
+        {
+            "id": row["id"],
+            "source": row["source_name"],
+            "target": row["target_name"],
+            "last_activity": row["last_activity"],
+            "threat_summary": row["threat_summary"] or "최근 통신",
+        }
+        for row in communications
+    ]
+
+    return jsonify(
+        {
+            "agents": agents,
+            "nodes": graph_nodes,
+            "edges": graph_edges,
+            "communications": comm_details,
+        }
+    )
 
 
 @app.route("/api/packets")
@@ -318,6 +362,7 @@ def api_packets():
     severity = request.args.get("severity")
     source = request.args.get("source")
     target = request.args.get("target")
+    layer = request.args.get("layer")
 
     query = "SELECT * FROM packets WHERE 1=1"
     params = []
@@ -334,6 +379,9 @@ def api_packets():
     if target:
         query += " AND target_agent LIKE ?"
         params.append(f"%{target}%")
+    if layer:
+        query += " AND protocol_layer = ?"
+        params.append(layer)
 
     query += " ORDER BY datetime(timestamp) DESC"
 
@@ -342,6 +390,41 @@ def api_packets():
     packets = [format_packet(row) for row in rows]
 
     return jsonify({"packets": packets})
+
+
+@app.route("/api/overview")
+def api_overview():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    agent_count = cur.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
+    comm_count = cur.execute("SELECT COUNT(*) FROM communications").fetchone()[0]
+    total_packets = cur.execute("SELECT COUNT(*) FROM packets").fetchone()[0]
+
+    severity_rows = cur.execute(
+        """
+        SELECT severity, COUNT(*) as cnt
+        FROM packets
+        GROUP BY severity
+        """
+    ).fetchall()
+    severity_counts = {row["severity"]: row["cnt"] for row in severity_rows}
+
+    last_packet = cur.execute(
+        "SELECT timestamp FROM packets ORDER BY datetime(timestamp) DESC LIMIT 1"
+    ).fetchone()
+    last_update = last_packet[0] if last_packet else None
+
+    return jsonify(
+        {
+            "agent_count": agent_count,
+            "communication_count": comm_count,
+            "total_packets": total_packets,
+            "severity_counts": severity_counts,
+            "high_threats": severity_counts.get("높음", 0),
+            "last_update": last_update,
+        }
+    )
 
 
 @app.route("/api/packets/recent")
