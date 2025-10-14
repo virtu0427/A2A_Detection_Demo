@@ -15,18 +15,30 @@
   </head>
   <body data-page="{% block page_id %}{% endblock %}">
     <header class="global-header">
-      <div class="brand">
-        <span class="brand-mark">A2A</span>
-        <div>
-          <strong>Multi-Agent 보안 관제</strong>
-          <p>Agent to Agent 통신을 위한 실시간 위협 탐지 허브</p>
+      <div class="header-content">
+        <div class="brand">
+          <div class="brand-logo-wrap">
+            <img
+              src="{{ url_for('static', filename='img/atg_logo.svg') }}"
+              alt="ATG 공식 로고"
+              class="brand-logo"
+            />
+          </div>
+          <div class="brand-copy">
+            <span class="brand-team">{{ branding.team }}</span>
+            <strong>{{ branding.solution }}</strong>
+            <p>{{ branding.tagline }}</p>
+            <div class="brand-meta">
+              <span class="brand-date">업데이트 {{ branding.build_date }}</span>
+            </div>
+          </div>
         </div>
+        <nav class="global-nav">
+          <a href="{{ url_for('dashboard') }}" class="nav-link{% if active_page == 'dashboard' %} is-active{% endif %}">실시간 관제</a>
+          <a href="{{ url_for('graph') }}" class="nav-link{% if active_page == 'graph' %} is-active{% endif %}">에이전트 그래프</a>
+          <a href="{{ url_for('packets') }}" class="nav-link{% if active_page == 'packets' %} is-active{% endif %}">패킷 분석</a>
+        </nav>
       </div>
-      <nav class="global-nav">
-        <a href="{{ url_for('dashboard') }}" class="nav-link{% if active_page == 'dashboard' %} is-active{% endif %}">실시간 관제</a>
-        <a href="{{ url_for('graph') }}" class="nav-link{% if active_page == 'graph' %} is-active{% endif %}">에이전트 그래프</a>
-        <a href="{{ url_for('packets') }}" class="nav-link{% if active_page == 'packets' %} is-active{% endif %}">패킷 분석</a>
-      </nav>
     </header>
 
     <main class="page-wrapper">
@@ -34,7 +46,12 @@
     </main>
 
     <footer class="page-footer">
-      <p>
+      <div class="footer-meta">
+        <span class="footer-team">{{ branding.team }}</span>
+        <span class="footer-date">{{ branding.build_date }}</span>
+      </div>
+      <p class="footer-copy">© {{ branding.year }} {{ branding.team }}. All rights reserved.</p>
+      <p class="footer-note">
         데모 데이터는 샘플 SQLite DB에서 제공합니다. 자세한 프로토콜 정보는
         <a href="https://a2a-protocol.org/latest/" target="_blank" rel="noreferrer">A2A 공식 문서</a>
         를 참고하세요.

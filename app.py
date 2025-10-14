@@ -16,6 +16,20 @@ app = Flask(__name__)
 event_queue: "queue.Queue[dict]" = queue.Queue(maxsize=100)
 event_thread_started = False
 
+
+@app.context_processor
+def inject_branding():
+    now = datetime.utcnow()
+    return {
+        "branding": {
+            "team": "BOB14기 Attager Team",
+            "solution": "A2A Multi-Agent 위협 탐지 센터",
+            "tagline": "Agent-to-Agent 보안 흐름을 지키는 실시간 관제",
+            "build_date": now.strftime("%Y.%m.%d"),
+            "year": now.year,
+        }
+    }
+
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
