@@ -2,129 +2,185 @@
 {% block title %}실시간 관제 · A2A 보안 센터{% endblock %}
 {% block page_id %}dashboard{% endblock %}
 {% block content %}
-  <div class="dashboard-layout">
-    <section class="panel hero-panel">
-      <div class="hero-copy">
-        <h1>실시간 위협 현황</h1>
-        <p>
-          Agent-to-Agent 통신에서 감지된 이상 징후를 한눈에 파악하고,
-          우선 대응이 필요한 이슈를 바로 추적하세요.
-        </p>
-        <div class="hero-tags">
-          <span>Live Stream</span>
-          <span>위험 지수 추적</span>
-          <span>자동 경보</span>
+  <div class="monitor-board">
+    <section class="monitor-title">
+      <div class="title-copy">
+        <h1>실시간 A2A 통합 관제</h1>
+        <p>에이전트 간 위협 트래픽을 24시간 추적하고 대응 지표를 한눈에 제공합니다.</p>
+      </div>
+      <div class="title-meta">
+        <span class="title-updated">마지막 갱신 · <strong id="metric-last-update">-</strong></span>
+      </div>
+    </section>
+
+    <section class="monitor-status">
+      <ul class="monitor-status-band">
+        <li class="status-item normal">
+          <span class="label">정상</span>
+          <strong id="status-normal-count">-</strong>
+          <small>가동</small>
+        </li>
+        <li class="status-item watch">
+          <span class="label">관심</span>
+          <strong id="status-watch-count">-</strong>
+          <small>추적</small>
+        </li>
+        <li class="status-item guard">
+          <span class="label">경계</span>
+          <strong id="status-guard-count">-</strong>
+          <small>중간 위협</small>
+        </li>
+        <li class="status-item critical">
+          <span class="label">심각</span>
+          <strong id="status-critical-count">-</strong>
+          <small>즉시 대응</small>
+        </li>
+      </ul>
+    </section>
+
+    <section class="monitor-kpis">
+      <div class="kpi-card">
+        <span class="kpi-label">연결된 에이전트</span>
+        <strong class="kpi-value" id="metric-agent-count">-</strong>
+        <div class="kpi-progress" data-target="agent-count" data-max="12" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="12">
+          <span></span>
         </div>
       </div>
-      <div class="metric-capsule">
-        <dl>
-          <div>
-            <dt>연결된 에이전트</dt>
-            <dd id="metric-agent-count">-</dd>
-          </div>
-          <div>
-            <dt>감지된 고위험</dt>
-            <dd id="metric-high-threats">-</dd>
-          </div>
-          <div>
-            <dt>감시 중 연결</dt>
-            <dd id="metric-active-links">-</dd>
-          </div>
-          <div>
-            <dt>수집된 패킷</dt>
-            <dd id="metric-total-packets">-</dd>
-          </div>
-        </dl>
-        <p class="metric-updated">마지막 갱신 · <span id="metric-last-update">-</span></p>
-      </div>
-    </section>
-
-    <section class="panel trend-panel">
-      <header class="panel-header">
-        <div>
-          <h2>시간대별 탐지 추이</h2>
-          <p>최근 12개 구간 동안 수집된 위협 패킷 변화를 시각화했습니다.</p>
+      <div class="kpi-card">
+        <span class="kpi-label">감시 중 연결</span>
+        <strong class="kpi-value" id="metric-active-links">-</strong>
+        <div class="kpi-progress" data-target="active-links" data-max="12" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="12">
+          <span></span>
         </div>
-      </header>
-      <div class="trend-chart-wrapper">
-        <canvas id="trend-chart" aria-label="시간대별 탐지 추이" role="img"></canvas>
       </div>
-    </section>
-
-    <section class="panel chart-panel">
-      <header class="panel-header">
-        <h2>탐지 현황 요약</h2>
-        <div class="panel-actions">
-          <button type="button" id="btn-refresh-overview">데이터 새로고침</button>
+      <div class="kpi-card">
+        <span class="kpi-label">고위험 탐지</span>
+        <strong class="kpi-value" id="metric-high-threats">-</strong>
+        <div class="kpi-progress" data-target="high-threats" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100">
+          <span></span>
         </div>
-      </header>
-      <div class="chart-grid">
-        <figure>
-          <figcaption>위협 심각도 분포</figcaption>
-          <canvas id="severity-chart" aria-label="위협 심각도 분포" role="img"></canvas>
-        </figure>
-        <figure>
-          <figcaption>레이어별 탐지량</figcaption>
-          <canvas id="layer-chart" aria-label="레이어별 탐지량" role="img"></canvas>
-        </figure>
       </div>
-    </section>
-
-    <section class="panel persistent-panel">
-      <header class="panel-header">
-        <h2>지속 경보 에이전트</h2>
-        <p>동일 위협이 반복되는 에이전트를 우선적으로 점검하세요.</p>
-      </header>
-      <ul id="persistent-list" class="persistent-list"></ul>
-    </section>
-
-    <section class="panel feed-panel">
-      <header class="panel-header">
-        <div>
-          <h2>실시간 위협 이벤트</h2>
-          <p>고위험만 보기 스위치를 사용하여 치명도를 빠르게 선별하세요.</p>
+      <div class="kpi-card">
+        <span class="kpi-label">누적 패킷</span>
+        <strong class="kpi-value" id="metric-total-packets">-</strong>
+        <div class="kpi-progress" data-target="total-packets" data-max="60" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="60">
+          <span></span>
         </div>
-        <label class="toggle">
-          <input type="checkbox" id="toggle-critical" />
-          <span>고위험만 보기</span>
-        </label>
-      </header>
-      <div id="live-feed" class="live-feed" role="list"></div>
-    </section>
-
-    <section class="panel timeline-panel">
-      <header class="panel-header">
-        <h2>최근 저장 로그</h2>
-        <p>상세 내용을 클릭하면 이벤트 상세 페이지로 이동합니다.</p>
-      </header>
-      <ol id="timeline-list" class="timeline" role="list"></ol>
-    </section>
-
-    <section class="panel note-panel">
-      <header class="panel-header">
-        <h2>관제 노트</h2>
-      </header>
-      <div class="note-scroll">
-        <article class="note-card">
-          <h3>추천 대응</h3>
-          <p>동일 ID Task 재시도 패턴이 3회 이상 발생하면 자동 차단 규칙을 검토하세요.</p>
-        </article>
-        <article class="note-card">
-          <h3>모니터링 체크리스트</h3>
-          <ul>
-            <li>격리된 에이전트의 재연결 시도 추적</li>
-            <li>AgentCard 스키마 변경 알림 구독</li>
-            <li>Artifact 해시 이상 시 수동 검증 수행</li>
-          </ul>
-        </article>
-        <article class="note-card">
-          <h3>위협 인텔리전스</h3>
-          <p>외부 의존성 업데이트 전 사전 검증을 자동화하여 공급망 위협을 최소화하세요.</p>
-        </article>
       </div>
     </section>
+
+    <div class="monitor-grid">
+      <div class="monitor-column">
+        <section class="monitor-section monitor-trend">
+          <header class="section-header">
+            <h2>시간대별 탐지 추이</h2>
+            <p>최근 12개 구간 동안 수집된 위협 패킷 변화를 시각화합니다.</p>
+          </header>
+          <div class="trend-surface">
+            <canvas id="trend-chart" aria-label="시간대별 탐지 추이" role="img"></canvas>
+          </div>
+        </section>
+
+        <section class="monitor-section monitor-summary">
+          <header class="section-header">
+            <h2>탐지 현황 요약</h2>
+            <div class="section-actions">
+              <button type="button" id="btn-refresh-overview">데이터 새로고침</button>
+            </div>
+          </header>
+          <div class="summary-body">
+            <figure>
+              <figcaption>위협 심각도 분포</figcaption>
+              <canvas id="severity-chart" aria-label="위협 심각도 분포" role="img"></canvas>
+            </figure>
+            <figure>
+              <figcaption>레이어별 탐지량</figcaption>
+              <canvas id="layer-chart" aria-label="레이어별 탐지량" role="img"></canvas>
+            </figure>
+          </div>
+          <div class="summary-bars">
+            <div class="summary-bar" data-severity="높음">
+              <span class="summary-label">고위험</span>
+              <div class="summary-track" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100">
+                <span id="severity-bar-high"></span>
+              </div>
+              <span class="summary-value" id="summary-high-value">-</span>
+            </div>
+            <div class="summary-bar" data-severity="중간">
+              <span class="summary-label">중간 위험</span>
+              <div class="summary-track" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100">
+                <span id="severity-bar-medium"></span>
+              </div>
+              <span class="summary-value" id="summary-medium-value">-</span>
+            </div>
+            <div class="summary-bar" data-severity="낮음">
+              <span class="summary-label">낮은 위험</span>
+              <div class="summary-track" role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="100">
+                <span id="severity-bar-low"></span>
+              </div>
+              <span class="summary-value" id="summary-low-value">-</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="monitor-column">
+        <section class="monitor-section monitor-feed">
+          <header class="section-header">
+            <h2>실시간 위협 이벤트</h2>
+            <div class="section-actions">
+              <label class="toggle">
+                <input type="checkbox" id="toggle-critical" />
+                <span>고위험만 보기</span>
+              </label>
+            </div>
+          </header>
+          <div id="live-feed" class="live-feed" role="list"></div>
+        </section>
+
+        <section class="monitor-section monitor-timeline">
+          <header class="section-header">
+            <h2>최근 저장 로그</h2>
+            <p>상세 내용을 클릭하면 이벤트 상세 페이지로 이동합니다.</p>
+          </header>
+          <ol id="timeline-list" class="timeline" role="list"></ol>
+        </section>
+      </div>
+
+      <div class="monitor-column">
+        <section class="monitor-section monitor-persistent">
+          <header class="section-header">
+            <h2>지속 경보 에이전트</h2>
+            <p>동일 위협이 반복되는 에이전트를 우선 점검하세요.</p>
+          </header>
+          <ul id="persistent-list" class="persistent-list"></ul>
+        </section>
+
+        <section class="monitor-section monitor-notes">
+          <header class="section-header">
+            <h2>관제 노트</h2>
+            <p>대응팀을 위한 요약 메모입니다.</p>
+          </header>
+          <div class="note-scroll">
+            <article class="note-card">
+              <h3>추천 대응</h3>
+              <p>동일 ID Task 재시도 패턴이 3회 이상 발생하면 자동 차단 규칙을 검토하세요.</p>
+            </article>
+            <article class="note-card">
+              <h3>모니터링 체크리스트</h3>
+              <ul>
+                <li>격리된 에이전트의 재연결 시도 추적</li>
+                <li>AgentCard 스키마 변경 알림 구독</li>
+                <li>Artifact 해시 이상 시 수동 검증 수행</li>
+              </ul>
+            </article>
+            <article class="note-card">
+              <h3>위협 인텔리전스</h3>
+              <p>외부 의존성 업데이트 전 사전 검증을 자동화하여 공급망 위협을 최소화하세요.</p>
+            </article>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
-{% endblock %}
-{% block extra_body %}
-  {{ super() }}
 {% endblock %}

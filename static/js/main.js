@@ -160,25 +160,103 @@ function bindAlertBarClose() {
   });
 }
 
+function updateKpiProgress(target, value, fallbackMax) {
+  const container = document.querySelector(`.kpi-progress[data-target='${target}']`);
+  if (!container) return;
+  const bar = container.querySelector('span');
+  if (!bar) return;
+
+  const maxAttr = Number(container.dataset.max);
+  let denominator = Number.isFinite(maxAttr) && maxAttr > 0 ? maxAttr : undefined;
+  if (!denominator || (value > denominator && !container.dataset.max)) {
+    denominator = fallbackMax && fallbackMax > 0 ? fallbackMax : value || 1;
+  }
+  if (!denominator || denominator <= 0) {
+    denominator = 1;
+  }
+
+  const ratio = Math.max(0, Math.min(value / denominator, 1));
+  bar.style.width = `${(ratio * 100).toFixed(2)}%`;
+  container.setAttribute('aria-valuenow', String(value));
+  container.setAttribute('aria-valuemax', String(denominator));
+}
+
+function renderSeverityBars(severityCounts = {}, totalPackets = 0) {
+  const items = [
+    { key: '높음', barId: 'severity-bar-high', valueId: 'summary-high-value' },
+    { key: '중간', barId: 'severity-bar-medium', valueId: 'summary-medium-value' },
+    { key: '낮음', barId: 'severity-bar-low', valueId: 'summary-low-value' }
+  ];
+
+  const fallbackTotal = items.reduce((acc, item) => acc + (severityCounts[item.key] || 0), 0);
+  const denominator = totalPackets > 0 ? totalPackets : fallbackTotal;
+
+  items.forEach(({ key, barId, valueId }) => {
+    const value = severityCounts[key] || 0;
+    const valueEl = document.getElementById(valueId);
+    if (valueEl) valueEl.textContent = String(value);
+
+    const bar = document.getElementById(barId);
+    if (!bar) return;
+
+    const host = bar.parentElement;
+    const ratio = denominator > 0 ? Math.min(value / denominator, 1) : 0;
+    bar.style.width = `${(ratio * 100).toFixed(2)}%`;
+    if (host) {
+      host.setAttribute('aria-valuenow', String(value));
+      host.setAttribute('aria-valuemax', String(denominator));
+    }
+  });
+}
+
+function renderStatusBand(statusCounts = {}, severityCounts = {}, agentTotal = 0) {
+  function setValue(id, value, tooltip) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = String(value);
+    const host = el.closest('.status-item');
+    if (host && tooltip) {
+      host.setAttribute('title', tooltip);
+    }
+  }
+
+  const normalValue = statusCounts['정상'] || 0;
+  const watchValue = statusCounts['주의'] || 0;
+  const isolatedValue = statusCounts['격리'] || 0;
+  const guardValue = severityCounts['중간'] || 0;
+  const criticalThreat = severityCounts['높음'] || 0;
+  const criticalValue = criticalThreat + isolatedValue;
+
+  setValue('status-normal-count', normalValue, `정상 상태 에이전트 ${normalValue}명 / 총 ${agentTotal}명`);
+  setValue('status-watch-count', watchValue, `주의 상태 에이전트 ${watchValue}명`);
+  setValue('status-guard-count', guardValue, `중간 위험 탐지 ${guardValue}건`);
+  setValue('status-critical-count', criticalValue, `격리 ${isolatedValue}명 · 고위험 ${criticalThreat}건`);
+}
+
 async function loadOverviewMetrics() {
   const res = await fetch('/api/overview');
   if (!res.ok) return;
   const data = await res.json();
 
+  const agentTotal = data.agent_count ?? 0;
+  const highThreatTotal = data.high_threats ?? 0;
+  const commTotal = data.communication_count ?? 0;
+  const packetTotal = data.total_packets ?? 0;
+
   const agentCount = document.getElementById('metric-agent-count');
-  if (agentCount) agentCount.textContent = data.agent_count ?? '-';
+  if (agentCount) agentCount.textContent = String(agentTotal);
 
   const highThreats = document.getElementById('metric-high-threats');
-  if (highThreats) highThreats.textContent = data.high_threats ?? '-';
+  if (highThreats) highThreats.textContent = String(highThreatTotal);
 
   const activeLinks = document.getElementById('metric-active-links');
-  if (activeLinks) activeLinks.textContent = data.communication_count ?? '-';
+  if (activeLinks) activeLinks.textContent = String(commTotal);
 
   const lastUpdate = document.getElementById('metric-last-update');
   if (lastUpdate) lastUpdate.textContent = data.last_update ? formatTimestamp(data.last_update) : '-';
 
   const totalPackets = document.getElementById('metric-total-packets');
-  if (totalPackets) totalPackets.textContent = data.total_packets ?? '-';
+  if (totalPackets) totalPackets.textContent = String(packetTotal);
 
   const severityCounts = data.severity_counts || {};
   const highMetric = document.getElementById('metric-severity-high');
@@ -188,6 +266,12 @@ async function loadOverviewMetrics() {
   const lowMetric = document.getElementById('metric-severity-low');
   if (lowMetric) lowMetric.textContent = severityCounts['낮음'] ?? '0';
 
+  renderStatusBand(data.status_counts || {}, severityCounts, agentTotal);
+  updateKpiProgress('agent-count', agentTotal);
+  updateKpiProgress('active-links', commTotal);
+  updateKpiProgress('high-threats', highThreatTotal, packetTotal || highThreatTotal || 1);
+  updateKpiProgress('total-packets', packetTotal);
+  renderSeverityBars(severityCounts, packetTotal);
   renderSeverityChart(severityCounts);
   renderLayerChart(data.layer_counts || {});
   renderPersistentList(data.persistent_agents || []);
@@ -213,16 +297,32 @@ function renderSeverityChart(severityCounts) {
       datasets: [
         {
           data: values,
-          backgroundColor: ['rgba(239,68,68,0.6)', 'rgba(249,115,22,0.6)', 'rgba(34,197,94,0.6)'],
+          backgroundColor: ['rgba(239,68,68,0.65)', 'rgba(249,115,22,0.6)', 'rgba(34,197,94,0.55)'],
           borderWidth: 1,
-          borderColor: 'rgba(15,23,42,0.6)'
+          borderColor: 'rgba(10,18,36,0.9)',
+          hoverOffset: 6
         }
       ]
     },
     options: {
+      maintainAspectRatio: false,
+      layout: { padding: 8 },
       plugins: {
-        legend: { position: 'bottom', labels: { color: '#cbd5f5' } }
-      }
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#cbd5f5',
+            boxWidth: 10,
+            font: { size: 10 }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.label}: ${context.parsed}건`
+          }
+        }
+      },
+      cutout: '58%'
     }
   });
 }
@@ -248,26 +348,33 @@ function renderLayerChart(layerCounts) {
         {
           label: '탐지량',
           data: values,
-          backgroundColor: 'rgba(56, 189, 248, 0.5)',
+          backgroundColor: 'rgba(56, 189, 248, 0.45)',
           borderColor: '#38bdf8',
           borderWidth: 1,
+          borderRadius: 4,
         }
       ]
     },
     options: {
+      maintainAspectRatio: false,
       scales: {
         x: {
-          ticks: { color: '#cbd5f5' },
+          ticks: { color: '#cbd5f5', font: { size: 10 } },
           grid: { color: 'rgba(148, 163, 184, 0.12)' }
         },
         y: {
-          ticks: { color: '#cbd5f5' },
+          ticks: { color: '#cbd5f5', font: { size: 10 } },
           grid: { color: 'rgba(148, 163, 184, 0.12)' },
           beginAtZero: true,
         }
       },
       plugins: {
-        legend: { display: false }
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.parsed.y}건`
+          }
+        }
       }
     }
   });
@@ -277,7 +384,7 @@ function renderTrendChart(trend = []) {
   const ctx = document.getElementById('trend-chart');
   if (!ctx) return;
 
-  const wrapper = ctx.closest('.trend-chart-wrapper');
+  const wrapper = ctx.closest('.trend-surface');
   let emptyState = wrapper ? wrapper.querySelector('.chart-empty') : null;
 
   if (!trend.length) {
@@ -328,7 +435,9 @@ function renderTrendChart(trend = []) {
           backgroundColor: gradient,
           pointBackgroundColor: '#38bdf8',
           pointBorderColor: '#0f172a',
-          pointRadius: 4,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          borderWidth: 2,
           fill: true,
           tension: 0.35,
         }
@@ -336,14 +445,15 @@ function renderTrendChart(trend = []) {
     },
     options: {
       maintainAspectRatio: false,
+      layout: { padding: 12 },
       scales: {
         x: {
-          ticks: { color: '#cbd5f5', maxRotation: 0, minRotation: 0 },
+          ticks: { color: '#cbd5f5', maxRotation: 0, minRotation: 0, font: { size: 10 } },
           grid: { display: false }
         },
         y: {
           beginAtZero: true,
-          ticks: { color: '#cbd5f5' },
+          ticks: { color: '#cbd5f5', font: { size: 10 } },
           grid: { color: 'rgba(148, 163, 184, 0.12)' }
         }
       },

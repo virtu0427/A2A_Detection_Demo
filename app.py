@@ -867,6 +867,15 @@ def api_overview():
     ).fetchall()
     severity_counts = {row["severity"]: row["cnt"] for row in severity_rows}
 
+    status_rows = cur.execute(
+        """
+        SELECT status, COUNT(*) as cnt
+        FROM agents
+        GROUP BY status
+        """
+    ).fetchall()
+    status_counts = {row["status"]: row["cnt"] for row in status_rows}
+
     layer_rows = cur.execute(
         """
         SELECT protocol_layer, COUNT(*) as cnt
@@ -950,6 +959,7 @@ def api_overview():
             "communication_count": comm_count,
             "total_packets": total_packets,
             "severity_counts": severity_counts,
+            "status_counts": status_counts,
             "layer_counts": layer_counts,
             "high_threats": severity_counts.get("높음", 0),
             "last_update": last_update,
