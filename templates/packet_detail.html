@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}패킷 상세 · {{ packet.threat_type }}{% endblock %}
+{% block page_id %}packet-detail{% endblock %}
+{% block content %}
+  <section class="panel hero-panel compact">
+    <div class="hero-copy">
+      <h1>{{ packet.threat_type }}</h1>
+      <p>{{ packet.description }}</p>
+      <div class="hero-tags">
+        <span>{{ packet.protocol_layer }}</span>
+        <span>{{ packet.severity }}</span>
+      </div>
+    </div>
+    <div class="metric-capsule">
+      <dl>
+        <div>
+          <dt>탐지 시각</dt>
+          <dd>{{ packet.timestamp.replace('T', ' ') }}</dd>
+        </div>
+        <div>
+          <dt>출발 에이전트</dt>
+          <dd>
+            {% if packet.source_agent_id %}
+              <a href="{{ url_for('agent_detail', agent_id=packet.source_agent_id) }}">{{ packet.source_agent }}</a>
+            {% else %}
+              {{ packet.source_agent }}
+            {% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt>도착 에이전트</dt>
+          <dd>
+            {% if packet.target_agent_id %}
+              <a href="{{ url_for('agent_detail', agent_id=packet.target_agent_id) }}">{{ packet.target_agent }}</a>
+            {% else %}
+              {{ packet.target_agent }}
+            {% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt>대응</dt>
+          <dd>{{ packet.resolution }}</dd>
+        </div>
+      </dl>
+      <p class="metric-updated">관련 에이전트 상세에서 후속 조치를 확인하세요.</p>
+    </div>
+  </section>
+{% endblock %}
