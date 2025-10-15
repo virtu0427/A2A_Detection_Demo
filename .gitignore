@@ -1,0 +1,14 @@
+# Python cache directories
+__pycache__/
+*.py[cod]
+
+# SQLite database created at runtime
+*.db
+
+# Virtual environment directories
+.venv/
+venv/
+ENV/
+
+# Local environment variables or configuration
+*.env
