@@ -4,33 +4,54 @@ const severityMap = {
   '낮음': 'low'
 };
 
-const statusColorMap = {
-  '정상': 'status-normal',
-  '주의': 'status-warning',
-  '격리': 'status-critical'
-};
-
 let liveEvents = [];
 let showOnlyCritical = false;
+let severityChart;
+let layerChart;
+let alertHistory = [];
 
 function formatTimestamp(value) {
   if (!value) return '-';
   return value.replace('T', ' ');
 }
 
-function createToast(event) {
-  const container = document.querySelector('.toast-container');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = `toast severity-${severityMap[event.severity] || 'medium'}`;
-  toast.innerHTML = `
-    <strong>${event.threat_type || '실시간 경보'} · ${event.severity}</strong>
-    <p>${formatTimestamp(event.timestamp)}<br />
-    ${event.source_agent} → ${event.target_agent}<br />
-    ${event.description}</p>
-  `;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 8000);
+function setupNavigation() {
+  const nav = document.querySelector('.side-nav');
+  const toggle = document.querySelector('.nav-toggle');
+  const close = document.querySelector('.side-nav-close');
+
+  if (!nav || !toggle) return;
+
+  const expand = () => {
+    nav.dataset.state = 'expanded';
+  };
+
+  const collapse = () => {
+    nav.dataset.state = 'collapsed';
+  };
+
+  toggle.addEventListener('click', () => {
+    if (nav.dataset.state === 'expanded') {
+      collapse();
+    } else {
+      expand();
+    }
+  });
+
+  if (close) {
+    close.addEventListener('click', collapse);
+  }
+
+  const handleResize = () => {
+    if (window.innerWidth >= 1024) {
+      expand();
+    } else {
+      collapse();
+    }
+  };
+
+  window.addEventListener('resize', handleResize);
+  handleResize();
 }
 
 function renderLiveFeed() {
@@ -53,8 +74,9 @@ function renderLiveFeed() {
   }
 
   filtered.forEach((event) => {
-    const card = document.createElement('article');
+    const card = document.createElement('a');
     card.className = 'live-card';
+    card.href = `/alerts/${event.id}`;
     card.innerHTML = `
       <header>
         <span class="badge ${severityMap[event.severity] || 'medium'}">${event.severity}</span>
@@ -68,35 +90,66 @@ function renderLiveFeed() {
   });
 }
 
+function renderAlertBar() {
+  const bar = document.querySelector('.alert-bar');
+  const track = document.querySelector('.alert-track');
+  if (!bar || !track) return;
+
+  track.innerHTML = '';
+  if (!alertHistory.length) {
+    bar.classList.remove('is-visible');
+    return;
+  }
+  alertHistory.forEach((item) => {
+    const link = document.createElement('a');
+    link.className = `alert-item`;
+    link.href = `/alerts/${item.id}`;
+    link.innerHTML = `
+      <span class="badge ${severityMap[item.severity] || 'medium'}">${item.severity}</span>
+      <span>${item.threat_type} · ${item.source_agent} → ${item.target_agent}</span>
+    `;
+    track.appendChild(link);
+  });
+
+  bar.classList.add('is-visible');
+}
+
+function updateAlertBar(event) {
+  alertHistory.unshift(event);
+  if (alertHistory.length > 3) {
+    alertHistory = alertHistory.slice(0, 3);
+  }
+  renderAlertBar();
+}
+
+function bindAlertBarClose() {
+  const bar = document.querySelector('.alert-bar');
+  const close = document.querySelector('.alert-close');
+  if (!bar || !close) return;
+  close.addEventListener('click', () => {
+    bar.classList.remove('is-visible');
+  });
+}
+
 async function loadOverviewMetrics() {
   const res = await fetch('/api/overview');
   if (!res.ok) return;
   const data = await res.json();
 
   const agentCount = document.getElementById('metric-agent-count');
-  if (agentCount) {
-    agentCount.textContent = data.agent_count ?? '-';
-  }
+  if (agentCount) agentCount.textContent = data.agent_count ?? '-';
 
   const highThreats = document.getElementById('metric-high-threats');
-  if (highThreats) {
-    highThreats.textContent = data.high_threats ?? '-';
-  }
+  if (highThreats) highThreats.textContent = data.high_threats ?? '-';
 
   const activeLinks = document.getElementById('metric-active-links');
-  if (activeLinks) {
-    activeLinks.textContent = data.communication_count ?? '-';
-  }
+  if (activeLinks) activeLinks.textContent = data.communication_count ?? '-';
 
   const lastUpdate = document.getElementById('metric-last-update');
-  if (lastUpdate) {
-    lastUpdate.textContent = data.last_update ? formatTimestamp(data.last_update) : '-';
-  }
+  if (lastUpdate) lastUpdate.textContent = data.last_update ? formatTimestamp(data.last_update) : '-';
 
   const totalPackets = document.getElementById('metric-total-packets');
-  if (totalPackets) {
-    totalPackets.textContent = data.total_packets ?? '-';
-  }
+  if (totalPackets) totalPackets.textContent = data.total_packets ?? '-';
 
   const severityCounts = data.severity_counts || {};
   const highMetric = document.getElementById('metric-severity-high');
@@ -105,6 +158,125 @@ async function loadOverviewMetrics() {
   if (mediumMetric) mediumMetric.textContent = severityCounts['중간'] ?? '0';
   const lowMetric = document.getElementById('metric-severity-low');
   if (lowMetric) lowMetric.textContent = severityCounts['낮음'] ?? '0';
+
+  renderSeverityChart(severityCounts);
+  renderLayerChart(data.layer_counts || {});
+  renderPersistentList(data.persistent_agents || []);
+}
+
+function renderSeverityChart(severityCounts) {
+  const ctx = document.getElementById('severity-chart');
+  if (!ctx) return;
+  const labels = ['높음', '중간', '낮음'];
+  const values = labels.map((label) => severityCounts[label] || 0);
+
+  if (severityChart) {
+    severityChart.data.datasets[0].data = values;
+    severityChart.update();
+    return;
+  }
+
+  severityChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [
+        {
+          data: values,
+          backgroundColor: ['rgba(239,68,68,0.6)', 'rgba(249,115,22,0.6)', 'rgba(34,197,94,0.6)'],
+          borderWidth: 1,
+          borderColor: 'rgba(15,23,42,0.6)'
+        }
+      ]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#cbd5f5' } }
+      }
+    }
+  });
+}
+
+function renderLayerChart(layerCounts) {
+  const ctx = document.getElementById('layer-chart');
+  if (!ctx) return;
+  const labels = Object.keys(layerCounts);
+  const values = labels.map((key) => layerCounts[key]);
+
+  if (layerChart) {
+    layerChart.data.labels = labels;
+    layerChart.data.datasets[0].data = values;
+    layerChart.update();
+    return;
+  }
+
+  layerChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '탐지량',
+          data: values,
+          backgroundColor: 'rgba(56, 189, 248, 0.5)',
+          borderColor: '#38bdf8',
+          borderWidth: 1,
+        }
+      ]
+    },
+    options: {
+      scales: {
+        x: {
+          ticks: { color: '#cbd5f5' },
+          grid: { color: 'rgba(148, 163, 184, 0.12)' }
+        },
+        y: {
+          ticks: { color: '#cbd5f5' },
+          grid: { color: 'rgba(148, 163, 184, 0.12)' },
+          beginAtZero: true,
+        }
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+}
+
+function renderPersistentList(items) {
+  const list = document.getElementById('persistent-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  if (!items.length) {
+    const li = document.createElement('li');
+    li.className = 'empty-state';
+    li.textContent = '지속 경보가 기록된 에이전트가 없습니다.';
+    list.appendChild(li);
+    return;
+  }
+
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'persistent-item';
+    li.innerHTML = `
+      <div>
+        <strong>${item.agent_name}</strong>
+        <span class="meta">최근: ${formatTimestamp(item.last_detected)}</span>
+      </div>
+      <div>
+        <span class="meta">반복 횟수 ${item.repeat_count}회</span>
+        <span class="meta">주요 위협 ${item.last_threat}</span>
+      </div>
+    `;
+    if (item.agent_id) {
+      const link = document.createElement('a');
+      link.href = `/agents/${item.agent_id}`;
+      link.textContent = '상세 보기';
+      li.appendChild(link);
+    }
+    list.appendChild(li);
+  });
 }
 
 async function loadTimeline() {
@@ -115,12 +287,19 @@ async function loadTimeline() {
   if (!timeline) return;
 
   timeline.innerHTML = '';
+  if (!data.packets.length) {
+    const li = document.createElement('li');
+    li.className = 'empty-state';
+    li.textContent = '최근 저장된 패킷이 없습니다.';
+    timeline.appendChild(li);
+    return;
+  }
+
   data.packets.forEach((packet) => {
     const item = document.createElement('li');
     item.className = `timeline-item severity-${severityMap[packet.severity] || 'medium'}`;
     item.innerHTML = `
-      <div class="timeline-marker"></div>
-      <div class="timeline-content">
+      <a href="/packets/${packet.id}">
         <div class="timeline-header">
           <strong>${packet.threat_type}</strong>
           <span class="badge ${severityMap[packet.severity] || 'medium'}">${packet.severity}</span>
@@ -128,15 +307,24 @@ async function loadTimeline() {
         <p class="meta">${formatTimestamp(packet.timestamp)} · ${packet.protocol_layer}</p>
         <p class="meta">${packet.source_agent} → ${packet.target_agent}</p>
         <p>${packet.description}</p>
-      </div>
+      </a>
     `;
     timeline.appendChild(item);
   });
+}
 
-  // 초기 실시간 카드 데이터가 없다면 타임라인으로 초기화
-  if (liveEvents.length === 0) {
-    liveEvents = data.packets.slice(0, 6);
-    renderLiveFeed();
+async function loadInitialAlerts() {
+  const res = await fetch('/api/alerts/recent');
+  if (!res.ok) return;
+  const data = await res.json();
+  if (!Array.isArray(data.alerts)) return;
+
+  liveEvents = data.alerts.slice(0, 12);
+  renderLiveFeed();
+
+  alertHistory = data.alerts.slice(0, 3);
+  if (alertHistory.length) {
+    renderAlertBar();
   }
 }
 
@@ -153,9 +341,101 @@ function startEventStream() {
   source.onmessage = (event) => {
     const payload = JSON.parse(event.data);
     appendLiveEvent(payload);
-    createToast(payload);
+    updateAlertBar(payload);
     loadOverviewMetrics();
   };
+}
+
+async function searchPackets(event) {
+  if (event) event.preventDefault();
+  const form = document.getElementById('packet-filter');
+  if (!form) return;
+
+  const formData = new FormData(form);
+  const params = new URLSearchParams();
+  for (const [key, value] of formData.entries()) {
+    if (value) params.append(key, value);
+  }
+
+  const res = await fetch(`/api/packets?${params.toString()}`);
+  if (!res.ok) return;
+  const data = await res.json();
+  const tbody = document.querySelector('#packet-table tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  if (data.packets.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="7" class="empty">조건에 맞는 패킷이 없습니다.</td>';
+    tbody.appendChild(row);
+    return;
+  }
+
+  data.packets.forEach((packet) => {
+    const row = document.createElement('tr');
+    row.dataset.link = `/packets/${packet.id}`;
+    row.innerHTML = `
+      <td>${formatTimestamp(packet.timestamp)}</td>
+      <td>${packet.source_agent}</td>
+      <td>${packet.target_agent}</td>
+      <td>${packet.protocol_layer}</td>
+      <td>${packet.threat_type}</td>
+      <td><span class="badge ${severityMap[packet.severity] || 'medium'}">${packet.severity}</span></td>
+      <td>${packet.description}<br/><span class="meta">대응: ${packet.resolution}</span></td>
+    `;
+    row.addEventListener('click', () => {
+      window.location.href = row.dataset.link;
+    });
+    tbody.appendChild(row);
+  });
+}
+
+function bindQuickFilters() {
+  const chips = document.querySelectorAll('.quick-filters .chip');
+  const form = document.getElementById('packet-filter');
+  if (!chips.length || !form) return;
+
+  chips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      if (chip.dataset.reset !== undefined) {
+        form.reset();
+      } else if (chip.dataset.severity) {
+        form.querySelector('select[name="severity"]').value = chip.dataset.severity;
+      }
+      searchPackets();
+    });
+  });
+}
+
+function initDashboard() {
+  loadOverviewMetrics();
+  loadInitialAlerts();
+  loadTimeline();
+  startEventStream();
+
+  const toggle = document.getElementById('toggle-critical');
+  if (toggle) {
+    toggle.addEventListener('change', (event) => {
+      showOnlyCritical = event.target.checked;
+      renderLiveFeed();
+    });
+  }
+
+  const refresh = document.getElementById('btn-refresh-overview');
+  if (refresh) {
+    refresh.addEventListener('click', () => {
+      loadOverviewMetrics();
+      loadTimeline();
+    });
+  }
+}
+
+function initGraph() {
+  loadAgentGraph();
+  const refreshButton = document.getElementById('btn-refresh-communications');
+  if (refreshButton) {
+    refreshButton.addEventListener('click', refreshCommunications);
+  }
 }
 
 async function loadAgentGraph() {
@@ -229,13 +509,18 @@ async function loadAgentGraph() {
       const agentId = params.nodes[0];
       const agent = data.agents.find((item) => item.id === agentId);
       if (!agent) return;
-      const statusClass = statusColorMap[agent.status] || 'status-normal';
+      const statusClass = {
+        '정상': 'status-normal',
+        '주의': 'status-warning',
+        '격리': 'status-critical'
+      }[agent.status] || 'status-normal';
       detailPanel.innerHTML = `
         <h4>${agent.name}</h4>
         <p class="meta">역할: ${agent.role}</p>
         <p class="meta">상태: <span class="status-indicator"><span class="status-dot ${statusClass}"></span>${agent.status}</span></p>
         <p class="meta">위험 점수: ${(agent.risk_score * 100).toFixed(1)}%</p>
         <p class="meta">최근 활동: ${formatTimestamp(agent.last_seen)}</p>
+        <p><a href="/agents/${agent.id}">상세 페이지 이동</a></p>
       `;
     }
   });
@@ -293,97 +578,6 @@ async function refreshCommunications() {
   renderCommunicationList(data.communications);
 }
 
-async function searchPackets(event) {
-  if (event) event.preventDefault();
-  const form = document.getElementById('packet-filter');
-  if (!form) return;
-
-  const formData = new FormData(form);
-  const params = new URLSearchParams();
-  for (const [key, value] of formData.entries()) {
-    if (value) {
-      params.append(key, value);
-    }
-  }
-
-  const res = await fetch(`/api/packets?${params.toString()}`);
-  if (!res.ok) return;
-  const data = await res.json();
-  const tbody = document.querySelector('#packet-table tbody');
-  if (!tbody) return;
-
-  tbody.innerHTML = '';
-  if (data.packets.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="7" class="empty">조건에 맞는 패킷이 없습니다.</td>';
-    tbody.appendChild(row);
-    return;
-  }
-
-  data.packets.forEach((packet) => {
-    const row = document.createElement('tr');
-    const severityClass = severityMap[packet.severity] || 'medium';
-    row.innerHTML = `
-      <td>${formatTimestamp(packet.timestamp)}</td>
-      <td>${packet.source_agent}</td>
-      <td>${packet.target_agent}</td>
-      <td>${packet.protocol_layer}</td>
-      <td>${packet.threat_type}</td>
-      <td><span class="badge ${severityClass}">${packet.severity}</span></td>
-      <td>${packet.description}<br/><span class="meta">대응: ${packet.resolution}</span></td>
-    `;
-    tbody.appendChild(row);
-  });
-}
-
-function bindQuickFilters() {
-  const chips = document.querySelectorAll('.quick-filters .chip');
-  const form = document.getElementById('packet-filter');
-  if (!chips.length || !form) return;
-
-  chips.forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const severitySelect = form.querySelector('select[name="severity"]');
-      if (chip.dataset.reset !== undefined) {
-        form.reset();
-      } else if (chip.dataset.severity) {
-        severitySelect.value = chip.dataset.severity;
-      }
-      searchPackets();
-    });
-  });
-}
-
-function initDashboard() {
-  loadOverviewMetrics();
-  loadTimeline();
-  startEventStream();
-
-  const toggle = document.getElementById('toggle-critical');
-  if (toggle) {
-    toggle.addEventListener('change', (event) => {
-      showOnlyCritical = event.target.checked;
-      renderLiveFeed();
-    });
-  }
-
-  const refresh = document.getElementById('btn-refresh-overview');
-  if (refresh) {
-    refresh.addEventListener('click', () => {
-      loadOverviewMetrics();
-      loadTimeline();
-    });
-  }
-}
-
-function initGraph() {
-  loadAgentGraph();
-  const refreshButton = document.getElementById('btn-refresh-communications');
-  if (refreshButton) {
-    refreshButton.addEventListener('click', refreshCommunications);
-  }
-}
-
 function initPackets() {
   loadOverviewMetrics();
   bindQuickFilters();
@@ -394,7 +588,58 @@ function initPackets() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initAgentDetail() {
+  const payload = window.agentDetailData;
+  if (!payload) return;
+
+  const container = document.getElementById('agent-detail-graph');
+  if (!container || typeof vis === 'undefined') return;
+
+  const nodes = new vis.DataSet();
+  nodes.add({
+    id: payload.agentId,
+    label: payload.name,
+    color: { background: '#0f172a', border: '#38bdf8' },
+    font: { color: '#f8fafc' }
+  });
+
+  payload.relatedAgents.forEach((agent) => {
+    nodes.add({
+      id: agent.id,
+      label: agent.name,
+      color: { background: '#111b31', border: '#4f83d9' },
+      font: { color: '#e2e8f0' }
+    });
+  });
+
+  const edges = new vis.DataSet();
+  payload.communications.forEach((comm) => {
+    const from = comm.source === payload.name ? payload.agentId : payload.relatedAgents.find((item) => item.name === comm.source)?.id;
+    const to = comm.target === payload.name ? payload.agentId : payload.relatedAgents.find((item) => item.name === comm.target)?.id;
+    if (from && to) {
+      edges.add({
+        from,
+        to,
+        label: comm.summary,
+        arrows: 'to',
+        color: { color: 'rgba(56, 189, 248, 0.5)', highlight: '#38bdf8' },
+        font: { color: '#94a3b8' }
+      });
+    }
+  });
+
+  new vis.Network(container, { nodes, edges }, {
+    physics: { enabled: true, stabilization: { iterations: 150 } },
+    interaction: { hover: true, tooltipDelay: 100 },
+    nodes: { shape: 'dot', size: 20 },
+    edges: { smooth: true }
+  });
+}
+
+function initPage() {
+  setupNavigation();
+  bindAlertBarClose();
+
   const page = document.body.dataset.page;
   if (page === 'dashboard') {
     initDashboard();
@@ -405,4 +650,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (page === 'packets') {
     initPackets();
   }
-});
+  if (page === 'agent-detail') {
+    initAgentDetail();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initPage);

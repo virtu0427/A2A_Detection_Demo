@@ -15,35 +15,51 @@
   </head>
   <body data-page="{% block page_id %}{% endblock %}">
     <header class="global-header">
-      <div class="header-content">
-        <div class="brand">
-          <div class="brand-logo-wrap">
-            <img
-              src="{{ url_for('static', filename='img/atg_logo.png') }}"
-              alt="ATG 공식 로고"
-              class="brand-logo"
-            />
-          </div>
-          <div class="brand-copy">
-            <span class="brand-team">{{ branding.team }}</span>
-            <strong>{{ branding.solution }}</strong>
-            <p>{{ branding.tagline }}</p>
-            <div class="brand-meta">
-              <span class="brand-date">업데이트 {{ branding.build_date }}</span>
-            </div>
-          </div>
+      <button class="nav-toggle" type="button" aria-label="내비게이션 토글">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      <a href="{{ url_for('dashboard') }}" class="brand-link">
+        <img
+          src="{{ url_for('static', filename='img/atg_logo.png') }}"
+          alt="ATG 공식 로고"
+          class="brand-logo"
+        />
+        <div class="brand-text">
+          <strong>{{ branding.solution }}</strong>
+          <span>{{ branding.team }}</span>
         </div>
-        <nav class="global-nav">
-          <a href="{{ url_for('dashboard') }}" class="nav-link{% if active_page == 'dashboard' %} is-active{% endif %}">실시간 관제</a>
-          <a href="{{ url_for('graph') }}" class="nav-link{% if active_page == 'graph' %} is-active{% endif %}">에이전트 그래프</a>
-          <a href="{{ url_for('packets') }}" class="nav-link{% if active_page == 'packets' %} is-active{% endif %}">패킷 분석</a>
-        </nav>
-      </div>
+      </a>
     </header>
 
-    <main class="page-wrapper">
-      {% block content %}{% endblock %}
-    </main>
+    <div class="app-shell">
+      <aside class="side-nav" data-state="collapsed">
+        <div class="side-nav-header">
+          <span class="side-nav-title">관제 메뉴</span>
+          <button class="side-nav-close" type="button" aria-label="내비게이션 닫기">×</button>
+        </div>
+        <nav class="side-nav-links">
+          <a href="{{ url_for('dashboard') }}" class="side-link{% if active_page == 'dashboard' %} is-active{% endif %}">
+            <span>실시간 관제</span>
+          </a>
+          <a href="{{ url_for('graph') }}" class="side-link{% if active_page == 'graph' %} is-active{% endif %}">
+            <span>에이전트 그래프</span>
+          </a>
+          <a href="{{ url_for('packets') }}" class="side-link{% if active_page == 'packets' %} is-active{% endif %}">
+            <span>패킷 분석</span>
+          </a>
+        </nav>
+        <div class="side-nav-footer">
+          <p class="side-meta">업데이트 {{ branding.build_date }}</p>
+          <p class="side-meta">© {{ branding.year }} {{ branding.team }}</p>
+        </div>
+      </aside>
+
+      <main class="page-wrapper">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
 
     <footer class="page-footer">
       <div class="footer-meta">
@@ -58,7 +74,13 @@
       </p>
     </footer>
 
+    <div class="alert-bar" aria-live="polite" aria-label="실시간 위협 알림">
+      <div class="alert-track"></div>
+      <button type="button" class="alert-close" aria-label="알림 숨기기">×</button>
+    </div>
+
     {% block extra_body %}{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-Y7QnSY3n5JVpaz6RtWLpmjHtkobaN6D+PfYZ7RUTpujISiFDUFxIr05oig3NbS59" crossorigin="anonymous" defer></script>
     <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
   </body>
 </html>
