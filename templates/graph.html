@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}에이전트 그래프 · A2A 보안 센터{% endblock %}
+{% block page_id %}graph{% endblock %}
+{% block extra_head %}
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/vis-network/styles/vis-network.min.css"
+  />
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js" defer></script>
+{% endblock %}
+{% block content %}
+  <section class="panel hero-panel compact">
+    <div class="hero-copy">
+      <h1>에이전트 위협 그래프</h1>
+      <p>
+        A2A 에이전트 간 통신 흐름과 탐지된 위협을 시각적으로 탐색하고,
+        위험한 연결을 빠르게 파악합니다.
+      </p>
+      <div class="hero-tags">
+        <span>관계 맵</span>
+        <span>위험 라벨링</span>
+        <span>상세 탐지 로그</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="graph-layout">
+    <section class="panel graph-panel">
+      <header class="panel-header">
+        <div>
+          <h2>통신 그래프</h2>
+          <p>노드와 연결선을 클릭하면 상세 탐지 내역을 확인할 수 있습니다.</p>
+        </div>
+        <div class="legend">
+          <span><span class="dot normal"></span>정상</span>
+          <span><span class="dot warning"></span>주의</span>
+          <span><span class="dot isolated"></span>격리</span>
+        </div>
+      </header>
+      <div id="graph-container"></div>
+    </section>
+    <aside class="panel detail-panel">
+      <h3>선택된 객체 정보</h3>
+      <div id="agent-detail" class="detail-body">
+        그래프에서 노드 또는 간선을 선택해 세부 정보를 확인하세요.
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div>
+        <h3>위험 통신 하이라이트</h3>
+        <p>최근 분석에서 위협 징후가 기록된 통신 세션입니다.</p>
+      </div>
+      <button type="button" id="btn-refresh-communications">새로고침</button>
+    </header>
+    <ul id="communication-list" class="communication-list"></ul>
+  </section>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}실시간 경보 상세 · {{ alert.threat_type }}{% endblock %}
+{% block page_id %}alert-detail{% endblock %}
+{% block content %}
+  <section class="panel hero-panel compact">
+    <div class="hero-copy">
+      <h1>{{ alert.threat_type }}</h1>
+      <p>{{ alert.description }}</p>
+      <div class="hero-tags">
+        <span>{{ alert.protocol_layer }}</span>
+        <span>{{ alert.severity }}</span>
+      </div>
+    </div>
+    <div class="metric-capsule">
+      <dl>
+        <div>
+          <dt>발생 시각</dt>
+          <dd>{{ alert.timestamp.replace('T', ' ') }}</dd>
+        </div>
+        <div>
+          <dt>출발 에이전트</dt>
+          <dd>{{ alert.source_agent }}</dd>
+        </div>
+        <div>
+          <dt>도착 에이전트</dt>
+          <dd>{{ alert.target_agent }}</dd>
+        </div>
+        <div>
+          <dt>심각도</dt>
+          <dd><span class="badge {{ 'high' if alert.severity == '높음' else 'medium' if alert.severity == '중간' else 'low' }}">{{ alert.severity }}</span></dd>
+        </div>
+      </dl>
+      <p class="metric-updated">실시간 스트림으로 수신된 경보입니다.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-header">
+      <h2>빠른 액션</h2>
+    </header>
+    <div class="note-card">
+      <p>관련 에이전트 상태를 점검하고, 반복된 경보 여부를 대시보드에서 확인하세요.</p>
+      <p>
+        {% if name_to_id.get(alert.source_agent) %}
+          <a href="{{ url_for('agent_detail', agent_id=name_to_id.get(alert.source_agent)) }}" class="side-link" style="display:inline-flex;">{{ alert.source_agent }} 상세</a>
+        {% endif %}
+        {% if name_to_id.get(alert.target_agent) %}
+          <a href="{{ url_for('agent_detail', agent_id=name_to_id.get(alert.target_agent)) }}" class="side-link" style="display:inline-flex; margin-left:0.4rem;">{{ alert.target_agent }} 상세</a>
+        {% endif %}
+      </p>
+    </div>
+  </section>
+{% endblock %}
