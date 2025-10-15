@@ -31,10 +31,13 @@
           <h2>통신 그래프</h2>
           <p>노드와 연결선을 클릭하면 상세 탐지 내역을 확인할 수 있습니다.</p>
         </div>
-        <div class="legend">
-          <span><span class="dot normal"></span>정상</span>
-          <span><span class="dot warning"></span>주의</span>
-          <span><span class="dot isolated"></span>격리</span>
+        <div class="graph-controls">
+          <div class="legend">
+            <span><span class="dot normal"></span>정상</span>
+            <span><span class="dot warning"></span>주의</span>
+            <span><span class="dot isolated"></span>격리</span>
+          </div>
+          <button type="button" id="btn-reset-graph">초기 보기</button>
         </div>
       </header>
       <div id="graph-container"></div>

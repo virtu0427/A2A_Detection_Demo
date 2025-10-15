@@ -233,6 +233,71 @@ def seed_database(conn: sqlite3.Connection):
         ),
     ]
 
+    packets.extend(
+        [
+            (
+                now - timedelta(minutes=20),
+                "Atlas-Planner",
+                "Helios-Executor",
+                "Layer 3",
+                "Task Replay",
+                "높음",
+                "캐시된 Task ID 재전송 시도가 반복되었습니다.",
+                "임시 토큰 폐기 및 세션 리셋",
+            ),
+            (
+                now - timedelta(minutes=30),
+                "Cetus-Analyzer",
+                "Hermes-Router",
+                "Layer 3",
+                "Cross-Agent Escalation",
+                "높음",
+                "여러 에이전트 세션에서 비정상 권한 상승이 감지되었습니다.",
+                "세션 전파 중단 및 역할 검증",
+            ),
+            (
+                now - timedelta(minutes=45),
+                "Hermes-Router",
+                "Nyx-Vault",
+                "Layer 2",
+                "Message Schema Violation",
+                "중간",
+                "에이전트 필드 순서 변조 시도가 발견되었습니다.",
+                "스키마 강제 정렬 적용",
+            ),
+            (
+                now - timedelta(hours=1, minutes=15),
+                "Atlas-Planner",
+                "Helios-Executor",
+                "Layer 4",
+                "Server Impersonation",
+                "높음",
+                "이전 세션과 유사한 위조 인증서가 재시도되었습니다.",
+                "미러링 노드 격리",
+            ),
+            (
+                now - timedelta(hours=2, minutes=5),
+                "Nyx-Vault",
+                "Cetus-Analyzer",
+                "Layer 6",
+                "Supply Chain Attack",
+                "중간",
+                "외부 의존성에서 임시 파일 삽입 징후가 확인되었습니다.",
+                "패키지 검증 재실행",
+            ),
+            (
+                now - timedelta(hours=3),
+                "Helios-Executor",
+                "Atlas-Planner",
+                "Layer 2",
+                "Artifact Tampering",
+                "낮음",
+                "과거 버전 아티팩트와 해시가 불일치합니다.",
+                "감시 대기열에 재배치",
+            ),
+        ]
+    )
+
     for packet in packets:
         conn.execute(
             """
@@ -849,6 +914,29 @@ def api_overview():
             }
         )
 
+    trend_rows = cur.execute(
+        """
+        SELECT strftime('%Y-%m-%d %H:00', timestamp) AS bucket,
+               COUNT(*) AS cnt
+        FROM packets
+        WHERE datetime(timestamp) >= datetime('now', '-12 hours')
+        GROUP BY bucket
+        ORDER BY datetime(bucket)
+        """
+    ).fetchall()
+
+    now_utc = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    buckets = [now_utc - timedelta(hours=offset) for offset in range(11, -1, -1)]
+    bucket_map = {row["bucket"]: row["cnt"] for row in trend_rows}
+    threat_trend = [
+        {
+            "window": bucket.strftime("%Y-%m-%d %H:00"),
+            "window_label": bucket.strftime("%m/%d %H시"),
+            "count": bucket_map.get(bucket.strftime("%Y-%m-%d %H:00"), 0),
+        }
+        for bucket in buckets
+    ]
+
     last_packet = cur.execute(
         "SELECT timestamp FROM packets ORDER BY datetime(timestamp) DESC LIMIT 1"
     ).fetchone()
@@ -866,6 +954,7 @@ def api_overview():
             "high_threats": severity_counts.get("높음", 0),
             "last_update": last_update,
             "persistent_agents": persistent_agents,
+            "threat_trend": threat_trend,
         }
     )
 

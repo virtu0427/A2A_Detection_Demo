@@ -8,7 +8,12 @@ let liveEvents = [];
 let showOnlyCritical = false;
 let severityChart;
 let layerChart;
+let trendChart;
 let alertHistory = [];
+let alertStreamStarted = false;
+let alertsInitialized = false;
+let mainAgentNetwork;
+let agentDetailNetwork;
 
 function formatTimestamp(value) {
   if (!value) return '-';
@@ -22,12 +27,17 @@ function setupNavigation() {
 
   if (!nav || !toggle) return;
 
+  const setState = (state) => {
+    nav.dataset.state = state;
+    document.body.dataset.navState = state;
+  };
+
   const expand = () => {
-    nav.dataset.state = 'expanded';
+    setState('expanded');
   };
 
   const collapse = () => {
-    nav.dataset.state = 'collapsed';
+    setState('collapsed');
   };
 
   toggle.addEventListener('click', () => {
@@ -42,10 +52,23 @@ function setupNavigation() {
     close.addEventListener('click', collapse);
   }
 
+  document.addEventListener('click', (event) => {
+    if (window.innerWidth >= 1180) return;
+    if (nav.dataset.state !== 'expanded') return;
+    if (nav.contains(event.target) || toggle.contains(event.target)) return;
+    collapse();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      collapse();
+    }
+  });
+
   const handleResize = () => {
-    if (window.innerWidth >= 1024) {
+    if (window.innerWidth >= 1180) {
       expand();
-    } else {
+    } else if (window.innerWidth < 1024) {
       collapse();
     }
   };
@@ -97,13 +120,18 @@ function renderAlertBar() {
 
   track.innerHTML = '';
   if (!alertHistory.length) {
-    bar.classList.remove('is-visible');
+    const empty = document.createElement('div');
+    empty.className = 'alert-empty';
+    empty.textContent = '최근 경보가 없습니다.';
+    track.appendChild(empty);
+    bar.classList.add('is-visible');
     return;
   }
   alertHistory.forEach((item) => {
     const link = document.createElement('a');
     link.className = `alert-item`;
     link.href = `/alerts/${item.id}`;
+    link.title = `${item.threat_type} · ${item.source_agent} → ${item.target_agent}`;
     link.innerHTML = `
       <span class="badge ${severityMap[item.severity] || 'medium'}">${item.severity}</span>
       <span>${item.threat_type} · ${item.source_agent} → ${item.target_agent}</span>
@@ -115,6 +143,7 @@ function renderAlertBar() {
 }
 
 function updateAlertBar(event) {
+  alertHistory = alertHistory.filter((item) => item.id !== event.id);
   alertHistory.unshift(event);
   if (alertHistory.length > 3) {
     alertHistory = alertHistory.slice(0, 3);
@@ -162,6 +191,7 @@ async function loadOverviewMetrics() {
   renderSeverityChart(severityCounts);
   renderLayerChart(data.layer_counts || {});
   renderPersistentList(data.persistent_agents || []);
+  renderTrendChart(data.threat_trend || []);
 }
 
 function renderSeverityChart(severityCounts) {
@@ -243,6 +273,92 @@ function renderLayerChart(layerCounts) {
   });
 }
 
+function renderTrendChart(trend = []) {
+  const ctx = document.getElementById('trend-chart');
+  if (!ctx) return;
+
+  const wrapper = ctx.closest('.trend-chart-wrapper');
+  let emptyState = wrapper ? wrapper.querySelector('.chart-empty') : null;
+
+  if (!trend.length) {
+    if (!emptyState && wrapper) {
+      emptyState = document.createElement('p');
+      emptyState.className = 'chart-empty';
+      emptyState.textContent = '표시할 데이터가 없습니다.';
+      wrapper.appendChild(emptyState);
+    }
+    if (trendChart) {
+      trendChart.destroy();
+      trendChart = null;
+    }
+    ctx.style.opacity = '0';
+    return;
+  }
+
+  if (emptyState) {
+    emptyState.remove();
+  }
+
+  ctx.style.opacity = '1';
+
+  const labels = trend.map((item) => item.window_label || item.window);
+  const values = trend.map((item) => item.count || 0);
+
+  if (trendChart) {
+    trendChart.data.labels = labels;
+    trendChart.data.datasets[0].data = values;
+    trendChart.update();
+    return;
+  }
+
+  const context = ctx.getContext('2d');
+  const gradient = context.createLinearGradient(0, 0, 0, ctx.height || ctx.clientHeight || 220);
+  gradient.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+  gradient.addColorStop(1, 'rgba(56, 189, 248, 0.02)');
+
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '탐지 건수',
+          data: values,
+          borderColor: '#38bdf8',
+          backgroundColor: gradient,
+          pointBackgroundColor: '#38bdf8',
+          pointBorderColor: '#0f172a',
+          pointRadius: 4,
+          fill: true,
+          tension: 0.35,
+        }
+      ]
+    },
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          ticks: { color: '#cbd5f5', maxRotation: 0, minRotation: 0 },
+          grid: { display: false }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#cbd5f5' },
+          grid: { color: 'rgba(148, 163, 184, 0.12)' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.parsed.y}건 탐지`
+          }
+        }
+      }
+    }
+  });
+}
+
 function renderPersistentList(items) {
   const list = document.getElementById('persistent-list');
   if (!list) return;
@@ -260,20 +376,30 @@ function renderPersistentList(items) {
     const li = document.createElement('li');
     li.className = 'persistent-item';
     li.innerHTML = `
-      <div>
+      <div class="persistent-head">
         <strong>${item.agent_name}</strong>
-        <span class="meta">최근: ${formatTimestamp(item.last_detected)}</span>
+        <span class="meta">최근 감지 ${formatTimestamp(item.last_detected)}</span>
       </div>
-      <div>
-        <span class="meta">반복 횟수 ${item.repeat_count}회</span>
+      <div class="persistent-body">
+        <span class="meta">반복 ${item.repeat_count}회</span>
         <span class="meta">주요 위협 ${item.last_threat}</span>
       </div>
+      <span class="persistent-link">상세 보기</span>
     `;
     if (item.agent_id) {
-      const link = document.createElement('a');
-      link.href = `/agents/${item.agent_id}`;
-      link.textContent = '상세 보기';
-      li.appendChild(link);
+      const navigate = () => {
+        window.location.href = `/agents/${item.agent_id}`;
+      };
+      li.setAttribute('role', 'link');
+      li.tabIndex = 0;
+      li.addEventListener('click', navigate);
+      li.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+          navigate();
+        }
+      });
+    } else {
+      li.classList.add('is-static');
     }
     list.appendChild(li);
   });
@@ -314,16 +440,22 @@ async function loadTimeline() {
 }
 
 async function loadInitialAlerts() {
-  const res = await fetch('/api/alerts/recent');
-  if (!res.ok) return;
-  const data = await res.json();
-  if (!Array.isArray(data.alerts)) return;
+  if (alertsInitialized) {
+    renderAlertBar();
+    return;
+  }
+  try {
+    const res = await fetch('/api/alerts/recent');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data.alerts)) return;
 
-  liveEvents = data.alerts.slice(0, 12);
-  renderLiveFeed();
+    liveEvents = data.alerts.slice(0, 12);
+    renderLiveFeed();
 
-  alertHistory = data.alerts.slice(0, 3);
-  if (alertHistory.length) {
+    alertHistory = data.alerts.slice(0, 3);
+  } finally {
+    alertsInitialized = true;
     renderAlertBar();
   }
 }
@@ -337,12 +469,19 @@ function appendLiveEvent(event) {
 }
 
 function startEventStream() {
+  if (alertStreamStarted || typeof EventSource === 'undefined') return;
+  alertStreamStarted = true;
   const source = new EventSource('/stream');
   source.onmessage = (event) => {
     const payload = JSON.parse(event.data);
     appendLiveEvent(payload);
     updateAlertBar(payload);
     loadOverviewMetrics();
+  };
+  source.onerror = () => {
+    source.close();
+    alertStreamStarted = false;
+    setTimeout(startEventStream, 5000);
   };
 }
 
@@ -409,9 +548,7 @@ function bindQuickFilters() {
 
 function initDashboard() {
   loadOverviewMetrics();
-  loadInitialAlerts();
   loadTimeline();
-  startEventStream();
 
   const toggle = document.getElementById('toggle-critical');
   if (toggle) {
@@ -456,8 +593,13 @@ async function loadAgentGraph() {
           border: '#0ea5e9'
         }
       },
+      borderWidth: 2,
       font: {
-        color: '#f8fafc'
+        color: '#f8fafc',
+        face: 'Noto Sans KR',
+        size: 16,
+        strokeWidth: 3,
+        strokeColor: '#0f172a'
       }
     }))
   );
@@ -471,7 +613,10 @@ async function loadAgentGraph() {
       },
       font: {
         color: '#94a3b8',
-        align: 'middle'
+        align: 'top',
+        size: 12,
+        face: 'Noto Sans KR',
+        background: 'rgba(15, 23, 42, 0.75)'
       },
       arrows: 'to'
     }))
@@ -483,25 +628,56 @@ async function loadAgentGraph() {
     {
       physics: {
         enabled: true,
-        stabilization: { iterations: 200 },
-        solver: 'forceAtlas2Based'
+        solver: 'barnesHut',
+        stabilization: { iterations: 250 },
+        barnesHut: {
+          gravitationalConstant: -3200,
+          centralGravity: 0.2,
+          springConstant: 0.04,
+          springLength: 180,
+        }
       },
       interaction: {
         hover: true,
         tooltipDelay: 120,
-        zoomView: true
+        zoomView: true,
+        minZoom: 0.45,
+        maxZoom: 1.6
       },
       edges: {
-        smooth: true
+        smooth: {
+          type: 'continuous',
+          roundness: 0.18
+        }
       },
       nodes: {
         shape: 'dot',
         size: 22
+      },
+      layout: {
+        improvedLayout: true
       }
     }
   );
 
+  mainAgentNetwork = network;
+
+  const resetButton = document.getElementById('btn-reset-graph');
+  if (resetButton) {
+    resetButton.onclick = () => {
+      if (!mainAgentNetwork) return;
+      mainAgentNetwork.fit({ animation: { duration: 400, easing: 'easeInOutQuad' } });
+    };
+  }
+
+  network.once('stabilized', () => {
+    network.fit({ animation: false });
+  });
+
   const detailPanel = document.getElementById('agent-detail');
+  if (detailPanel) {
+    detailPanel.innerHTML = '그래프에서 노드 또는 간선을 선택해 세부 정보를 확인하세요.';
+  }
 
   network.on('click', (params) => {
     if (!detailPanel) return;
@@ -623,22 +799,47 @@ function initAgentDetail() {
         label: comm.summary,
         arrows: 'to',
         color: { color: 'rgba(56, 189, 248, 0.5)', highlight: '#38bdf8' },
-        font: { color: '#94a3b8' }
+        font: { color: '#94a3b8', face: 'Noto Sans KR', size: 11, background: 'rgba(15, 23, 42, 0.72)' }
       });
     }
   });
 
-  new vis.Network(container, { nodes, edges }, {
-    physics: { enabled: true, stabilization: { iterations: 150 } },
-    interaction: { hover: true, tooltipDelay: 100 },
-    nodes: { shape: 'dot', size: 20 },
-    edges: { smooth: true }
+  agentDetailNetwork = new vis.Network(container, { nodes, edges }, {
+    physics: {
+      enabled: true,
+      solver: 'barnesHut',
+      stabilization: { iterations: 200 },
+      barnesHut: { gravitationalConstant: -2800, springLength: 160 }
+    },
+    interaction: { hover: true, tooltipDelay: 100, zoomView: true, minZoom: 0.5, maxZoom: 1.6 },
+    nodes: {
+      shape: 'dot',
+      size: 20,
+      font: { color: '#f8fafc', size: 14, face: 'Noto Sans KR', strokeWidth: 2, strokeColor: '#0f172a' },
+      borderWidth: 2,
+      color: { background: '#0f172a', border: '#38bdf8' }
+    },
+    edges: { smooth: { type: 'continuous', roundness: 0.2 } }
   });
+
+  agentDetailNetwork.once('stabilized', () => {
+    agentDetailNetwork.fit({ animation: false });
+  });
+
+  const resetButton = document.getElementById('btn-reset-agent-graph');
+  if (resetButton) {
+    resetButton.onclick = () => {
+      if (!agentDetailNetwork) return;
+      agentDetailNetwork.fit({ animation: { duration: 400, easing: 'easeInOutQuad' } });
+    };
+  }
 }
 
 function initPage() {
   setupNavigation();
   bindAlertBarClose();
+  loadInitialAlerts();
+  startEventStream();
 
   const page = document.body.dataset.page;
   if (page === 'dashboard') {
