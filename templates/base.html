@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}A2A Multi-Agent 위협 탐지 센터{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body data-page="{% block page_id %}{% endblock %}" data-nav-state="collapsed">
+    <header class="global-header">
+      <button class="nav-toggle" type="button" aria-label="내비게이션 토글">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      <a href="{{ url_for('dashboard') }}" class="brand-link">
+        <img
+          src="{{ url_for('static', filename='img/atg_logo.svg') }}"
+          alt="ATG 공식 로고"
+          class="brand-logo"
+        />
+        <div class="brand-text">
+          <strong>{{ branding.solution }}</strong>
+          <span>{{ branding.team }}</span>
+        </div>
+      </a>
+    </header>
+
+    <div class="app-shell">
+      <aside class="side-nav" data-state="collapsed">
+        <div class="side-nav-header">
+          <span class="side-nav-title">관제 메뉴</span>
+          <button class="side-nav-close" type="button" aria-label="내비게이션 닫기">×</button>
+        </div>
+        <nav class="side-nav-links">
+          <a href="{{ url_for('dashboard') }}" class="side-link{% if active_page == 'dashboard' %} is-active{% endif %}">
+            <span>실시간 관제</span>
+          </a>
+          <a href="{{ url_for('graph') }}" class="side-link{% if active_page == 'graph' %} is-active{% endif %}">
+            <span>에이전트 그래프</span>
+          </a>
+          <a href="{{ url_for('packets') }}" class="side-link{% if active_page == 'packets' %} is-active{% endif %}">
+            <span>패킷 분석</span>
+          </a>
+        </nav>
+        <div class="side-nav-footer">
+          <p class="side-meta">업데이트 {{ branding.build_date }}</p>
+          <p class="side-meta">© {{ branding.year }} {{ branding.team }}</p>
+        </div>
+      </aside>
+
+      <main class="page-wrapper">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+
+    <footer class="page-footer">
+      <div class="footer-meta">
+        <span class="footer-team">{{ branding.team }}</span>
+        <span class="footer-date">{{ branding.build_date }}</span>
+      </div>
+      <p class="footer-copy">© {{ branding.year }} {{ branding.team }}. All rights reserved.</p>
+      <p class="footer-note">
+        데모 데이터는 샘플 SQLite DB에서 제공합니다. 자세한 프로토콜 정보는
+        <a href="https://a2a-protocol.org/latest/" target="_blank" rel="noreferrer">A2A 공식 문서</a>
+        를 참고하세요.
+      </p>
+    </footer>
+
+    <div class="alert-bar" aria-live="polite" aria-label="실시간 위협 알림">
+      <div class="alert-track"></div>
+      <button type="button" class="alert-close" aria-label="알림 숨기기">×</button>
+    </div>
+
+    {% block extra_body %}{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-Y7QnSY3n5JVpaz6RtWLpmjHtkobaN6D+PfYZ7RUTpujISiFDUFxIr05oig3NbS59" crossorigin="anonymous" defer></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+  </body>
+</html>
